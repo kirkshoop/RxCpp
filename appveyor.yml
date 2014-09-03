@@ -7,10 +7,11 @@ branches:
         - appveyor
 
 build:
-    project: %APPVEYOR_BUILD_FOLDER%\projects\build\rxcpp.sln
+    project: projects\build\rxcpp.sln
 
 before_build:
     - mkdir projects\build
     - pushd projects\build
     - cmake -G"Visual Studio 12" -T"v120" -B. ..\CMake\
     - popd
+    - dir projects\build
