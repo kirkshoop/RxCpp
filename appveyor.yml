@@ -1,3 +1,5 @@
+version: 2.1.{build}
+
 branches:
 # whitelist
     only:
@@ -5,7 +7,7 @@ branches:
         - appveyor
 
 build:
-    project: projects\build\rxcpp.sln
+    project: %APPVEYOR_BUILD_FOLDER%\projects\build\rxcpp.sln
 
 before_build:
     - mkdir projects\build
