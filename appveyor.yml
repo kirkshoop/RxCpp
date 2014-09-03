@@ -18,3 +18,5 @@ before_build:
 build:
     project: projects\build\rxcpp.sln
 
+test-script:
+    - projects\build\Debug\rxcppv2_test.exe --reporter junit
