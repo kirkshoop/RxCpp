@@ -9,5 +9,6 @@ build:
 
 before_build:
     - mkdir projects\build
-    - cd projects\build
-    - cmake -G"Visual Studio 12" -T"v120" ..\CMake -B.
+    - pushd projects\build
+    - cmake -G"Visual Studio 12" -T"v120" -B. ..\CMake\
+    - popd
