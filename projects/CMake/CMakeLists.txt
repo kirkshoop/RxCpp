@@ -27,6 +27,7 @@ get_filename_component(RXCPP_DIR "${RXCPP_DIR}" PATH)
 MESSAGE( STATUS "RXCPP_DIR: " ${RXCPP_DIR} )
 
 include_directories(SYSTEM ${RXCPP_DIR}/ext/catch/include)
+include_directories(SYSTEM ${RXCPP_DIR}/ext/json/src)
 include_directories(${RXCPP_DIR}/Ix/CPP/src ${RXCPP_DIR}/Rx/v2/src)
 
 set(TEST_DIR ${RXCPP_DIR}/Rx/v2/test)
@@ -104,6 +105,14 @@ set(TESTS_EXAMPLE_SOURCES
 )
 add_executable(tests_example ${TESTS_EXAMPLE_SOURCES})
 TARGET_LINK_LIBRARIES(tests_example ${CMAKE_THREAD_LIBS_INIT})
+
+# define the sources of the tests example
+set(LEARNRX_EXAMPLE_SOURCES
+    ${EXAMPLES_DIR}/learnrx/main.cpp
+    ${RXCPP_DIR}/ext/json/src/json.cc
+)
+add_executable(learnrx ${LEARNRX_EXAMPLE_SOURCES})
+TARGET_LINK_LIBRARIES(learnrx ${CMAKE_THREAD_LIBS_INIT})
 
 # configure unit tests via CTest
 enable_testing()
