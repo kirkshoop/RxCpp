@@ -8,80 +8,12 @@
 #include "json.h"
 using json = nlohmann::json;
 
-#include "../../src/rxcpp/rx.hpp"
+#include "rxcpp/rx.hpp"
 namespace rx = rxcpp;
 namespace rxu = rxcpp::util;
 
-template<class T, class Lambda>
-void run_test(const char* name, std::initializer_list<T> il, Lambda l) {
-    auto required = rxu::to_vector(il);
-    auto actual = l().
-        reduce(
-            std::vector<T>(),
-            [](std::vector<T> s, json j){
-                s.push_back(j);
-                return std::move(s);
-            },
-            [](std::vector<T>& r){
-                return r;
-            }).
-        as_blocking().
-        first();
-    if (required == actual) {
-        std::cout << "PASSED - " << name << std::endl;
-    } else {
-        std::cout << "FAILED (required == actual) - " << name << std::endl
-            << required << std::endl
-            << "==" << std::endl
-            << actual << std::endl;
-    }
-
-}
-
-template<class Lambda>
-void Exercise_5_Use_map_to_project_an_array_of_videos_into_an_array_of_id_title_pairs(Lambda l) {
-    run_test(
-        __FUNCTION__,
-        {
-            R"({ "id": 70111470, "title": "Die Hard" })"_json,
-            R"({ "id": 654356453, "title": "Bad Boys" })"_json,
-            R"({ "id": 65432445, "title": "The Chamber" })"_json,
-            R"({ "id": 675465, "title": "Fracture" })"_json
-        },
-        l);
-}
-
-rx::observable<json> Exercise_5_Use_map_to_project_an_array_of_videos_into_an_array_of_id_title_pairs_ANSWER(json data) {
-    return rx::observable<>::iterate(data).
-        map([](json m){
-            return json({
-                {"id", m["id"]},
-                {"title", m["title"]}
-            });
-        });
-}
-
-template<class Lambda>
-void Exercise_8_Chain_filter_and_map_to_collect_the_ids_of_videos_that_have_a_rating_of_5_0(Lambda l) {
-    run_test(
-        __FUNCTION__,
-        {
-            json(654356453),
-            json(675465)
-        },
-        l);
-}
-
-rx::observable<json> Exercise_8_Chain_filter_and_map_to_collect_the_ids_of_videos_that_have_a_rating_of_5_0_ANSWER(json data) {
-    return rx::observable<>::iterate(data).
-        filter([](json m) {
-            return double(m["rating"]) == 5.0;
-        }).
-        map([](json m) {
-            return m["id"];
-        });
-}
-
+#include "run.hpp"
+#include "excercises.hpp"
 
 int main() {
 
@@ -133,6 +65,82 @@ int main() {
         [&]() {
             //return rx::observable<>::iterate(newReleases);
             return Exercise_8_Chain_filter_and_map_to_collect_the_ids_of_videos_that_have_a_rating_of_5_0_ANSWER(newReleases);
+        }
+    );
+
+    auto movieLists = R"(
+        [
+            {
+                "name": "Instant Queue",
+                "videos" : [
+                    {
+                        "id": 70111470,
+                        "title": "Die Hard",
+                        "boxarts": [
+                            { "width": 150, "height":200, "url":"http://cdn-0.nflximg.com/images/2891/DieHard150.jpg" },
+                            { "width": 200, "height":200, "url":"http://cdn-0.nflximg.com/images/2891/DieHard200.jpg" }
+                        ],
+                        "url": "http://api.netflix.com/catalog/titles/movies/70111470",
+                        "rating": 4.0,
+                        "bookmark": []
+                    },
+                    {
+                        "id": 654356453,
+                        "title": "Bad Boys",
+                        "boxarts": [
+                            { "width": 200, "height":200, "url":"http://cdn-0.nflximg.com/images/2891/BadBoys200.jpg" },
+                            { "width": 150, "height":200, "url":"http://cdn-0.nflximg.com/images/2891/BadBoys150.jpg" }
+
+                        ],
+                        "url": "http://api.netflix.com/catalog/titles/movies/70111470",
+                        "rating": 5.0,
+                        "bookmark": [{ "id":432534, "time":65876586 }]
+                    }
+                ]
+            },
+            {
+                "name": "New Releases",
+                "videos": [
+                    {
+                        "id": 65432445,
+                        "title": "The Chamber",
+                        "boxarts": [
+                            { "width": 150, "height":200, "url":"http://cdn-0.nflximg.com/images/2891/TheChamber150.jpg" },
+                            { "width": 200, "height":200, "url":"http://cdn-0.nflximg.com/images/2891/TheChamber200.jpg" }
+                        ],
+                        "url": "http://api.netflix.com/catalog/titles/movies/70111470",
+                        "rating": 4.0,
+                        "bookmark": []
+                    },
+                    {
+                        "id": 675465,
+                        "title": "Fracture",
+                        "boxarts": [
+                            { "width": 200, "height":200, "url":"http://cdn-0.nflximg.com/images/2891/Fracture200.jpg" },
+                            { "width": 150, "height":200, "url":"http://cdn-0.nflximg.com/images/2891/Fracture150.jpg" },
+                            { "width": 300, "height":200, "url":"http://cdn-0.nflximg.com/images/2891/Fracture300.jpg" }
+                        ],
+                        "url": "http://api.netflix.com/catalog/titles/movies/70111470",
+                        "rating": 5.0,
+                        "bookmark": [{ "id":432534, "time":65876586 }]
+                    }
+                ]
+            }
+        ]
+    )"_json;
+
+
+    Exercise_11_Use_map_and_merge_to_project_and_flatten_the_movieLists_into_an_array_of_video_ids(
+        [&]() {
+            //return rx::observable<>::iterate(newReleases);
+            return Exercise_11_Use_map_and_merge_to_project_and_flatten_the_movieLists_into_an_array_of_video_ids_ANSWER(movieLists);
+        }
+    );
+
+    Exercise_12_Retrieve_id_title_and_a_150_200_box_art_url_for_every_video(
+        [&]() {
+            //return rx::observable<>::iterate(newReleases);
+            return Exercise_12_Retrieve_id_title_and_a_150_200_box_art_url_for_every_video_ANSWER(movieLists);
         }
     );
 
