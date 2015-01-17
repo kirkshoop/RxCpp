@@ -15,11 +15,12 @@ Linux & OSX: [![Linux & Osx Status](http://img.shields.io/travis/Reactive-Extens
 # Interactive Extensions
 * Ix: The Interactive Extensions (Ix) is a .NET library which extends LINQ to Objects to provide many of the operators available in Rx but targeted for IEnumerable<T>.
 * IxJS: An implementation of LINQ to Objects and the Interactive Extensions (Ix) in JavaScript.
-* Ix++: An implantation of LINQ for Native Developers in C++
+* Ix++: An implementation of LINQ for Native Developers in C++
 
 #Documentation
 
 * The [learnrx](http://reactive-extensions.github.io/learnrx/) live RxJS tutorial by @jhusain is excellent
+ * some of the excercises have been ported to rxcpp in ```examples/learnrx```
 * Multi-Implementation documentation is being authored at [reactivex.io](http://reactivex.io/documentation/operators.html)
 * live [marble](http://rxmarbles.com/) diagrams!
 * [reactivex.io](http://reactivex.io/tutorials.html) also has a larger list of Rx resources.
