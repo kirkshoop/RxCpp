@@ -5,27 +5,37 @@ Linux & OSX: [![Linux & Osx Status](http://img.shields.io/travis/Reactive-Extens
 [![NuGet version](http://img.shields.io/nuget/v/RxCpp.svg?style=flat-square)](http://www.nuget.org/packages/RxCpp/)
 [![NuGet downloads](http://img.shields.io/nuget/dt/RxCpp.svg?style=flat-square)](http://www.nuget.org/packages/RxCpp/)
 
-# Reactive Extensions:
+#Reactive Extensions
 
 * Rx.NET: The Reactive Extensions (Rx) is a library for composing asynchronous and event-based programs using observable sequences and LINQ-style query operators.
 * RxJS: The Reactive Extensions for JavaScript (RxJS) is a library for composing asynchronous and event-based programs using observable sequences and LINQ-style query operators in JavaScript which can target both the browser and Node.js.
-* RxCpp: The Reactive Extensions for Native (RxC) is a library for composing asynchronous and event-based programs using observable sequences and LINQ-style query operators in both C and C++.
+* RxCpp: The Reactive Extensions for Native (RxCpp) is a library for composing asynchronous and event-based programs using observable sequences and LINQ-style query operators in both C and C++.
+* RxJava: The Reactive Extensions for Java (RxJava) is a library for composing asynchronous and event-based programs using observable sequences and LINQ-style query operators in Java which can target both the browser and Node.js.
 
 # Interactive Extensions
 * Ix: The Interactive Extensions (Ix) is a .NET library which extends LINQ to Objects to provide many of the operators available in Rx but targeted for IEnumerable<T>.
 * IxJS: An implementation of LINQ to Objects and the Interactive Extensions (Ix) in JavaScript.
 * Ix++: An implantation of LINQ for Native Developers in C++
 
-# Applications:
-* Tx: a set of code samples showing how to use LINQ to events, such as real-time standing queries and queries on past history from trace and log files, which targets ETW, Windows Event Logs and SQL Server Extended Events.
-* LINQ2Charts: an example for Rx bindings.  Similar to existing APIs like LINQ to XML, it allows developers to use LINQ to create/change/update charts in an easy way and avoid having to deal with XML or other underneath data structures. We would love to see more Rx bindings like this one.
+#Documentation
+
+* The [learnrx](http://reactive-extensions.github.io/learnrx/) live RxJS tutorial by @jhusain is excellent
+* Multi-Implementation documentation is being authored at [reactivex.io](http://reactivex.io/documentation/operators.html)
+* live [marble](http://rxmarbles.com/) diagrams!
+* [reactivex.io](http://reactivex.io/tutorials.html) also has a larger list of Rx resources.
+
+#Dependencies
+
+These are linked to the rxcpp repo using ```git submodule```
+
+* The tests are written using the excellent [Catch](https://github.com/philsquared/Catch) library by @philsquared
+* Some of the examples use the great [json](https://github.com/nlohmann/json) library by @nlohmann
 
 #Building RxCpp
 
-* RxCpp is regularly tested on OSX and Windows.
-* RxCpp is regularly built with Clang and VC
+* RxCpp is regularly tested on OSX, Ubuntu and Windows.
+* RxCpp is regularly built with Clang, GCC and VC.
 * RxCpp depends on the latest compiler releases.
-* RxCpp has an experimental build with gcc.
 
 RxCpp uses CMake to create build files for several platforms and IDE's
 
@@ -37,13 +47,12 @@ cd projects/build
 cmake -G"Xcode" ../CMake -B.
 ```
 
-####Visual Studio 13
+####Visual Studio 2013
 ```batch
 mkdir projects\build
 cd projects\build
-cmake -G"Visual Studio 12" ..\CMake -B.
+cmake -G"Visual Studio 12" -T v120 ..\CMake -B.
 ```
-* Note: open in VC2013 and upgrade to the 2013 toolset
 
 ###makefile builds
 
@@ -91,7 +100,7 @@ Example of by-tag
 ```rxcppv2_test [perf]```
 
 #Using RxCpp
-Add ```Rx/v2/src``` to the include paths
+Add ```Rx/v2/src``` as an include path
 
 ```cpp
 #include "rxcpp/rx.hpp"
@@ -150,4 +159,4 @@ int main(int argc, char** argv)
 
 Before submitting a feature or substantial code contribution please  discuss it with the team and ensure it follows the product roadmap. Note that all code submissions will be rigorously reviewed and tested by the Rx Team, and only those that meet an extremely high bar for both quality and design/roadmap appropriateness will be merged into the source.
 
-You will need to submit a  Contributor License Agreement form before submitting your pull request. This needs to only be done once for any Microsoft OSS project. Fill in the [Contributor License Agreement](https://cla.msopentech.com/) (CLA).
+A signed Contributor License Agreement is required in order for the Rx Team to merge a pull request. Github has been configured to prompt new contributors to sign the agreement and mark pull requests with the status of the Contributor License Agreement.
