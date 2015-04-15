@@ -13,36 +13,125 @@ namespace operators {
 
 namespace detail {
 
-template<class T, class Observable, class Coordination>
+template<class F>
+struct one_and_done
+{
+    F f;
+    template<class W>
+    auto operator()(W&) -> rxsc::action_result {
+        f();
+        return rxsc::action_result();
+    }
+};
+template<class F>
+auto make_one_and_done(F&& f) -> one_and_done<F> {
+    one_and_done<F> r = {std::forward<F>(f)};
+    return r;
+}
+
+template<class T, class Worker, class OnNext, class OnError, class OnCompleted>
+struct scheduled_subscriber_state : public std::enable_shared_from_this<scheduled_subscriber_state<T, Worker, OnNext, OnError, OnCompleted>>
+{
+    ~scheduled_subscriber_state(){
+        from.remove(fromtoken);
+    }
+    scheduled_subscriber_state(Worker w, composite_subscription f, composite_subscription t, OnNext n, OnError e, OnCompleted c)
+        : worker(w)
+        , from(f)
+        , to(t)
+        , onnext(n)
+        , onerror(e)
+        , oncompleted(c)
+    {
+        auto localState = this->shared_from_this();
+
+        auto disposer = make_one_and_done([=](){
+            localState->to.unsubscribe();
+        });
+
+        localState->to.add([=](){
+            localState->worker.schedule(disposer);
+        });
+
+        fromtoken = localState->from.add([=](){
+            localState->worker.schedule(disposer);
+        });
+    }
+
+    Worker worker;
+    composite_subscription from;
+    composite_subscription to;
+    OnNext onnext;
+    OnError onerror;
+    OnCompleted oncompleted;
+    typename composite_subscription::weak_subscription fromtoken;
+};
+
+template<class T, class Worker, class OnNext, class OnError, class OnCompleted>
+struct scheduled_subscriber
+{
+
+    std::shared_ptr<scheduled_subscriber_state<T, Worker, OnNext, OnError, OnCompleted>> state;
+
+    explicit scheduled_subscriber(std::shared_ptr<scheduled_subscriber_state<T, Worker, OnNext, OnError, OnCompleted>> s) : state(s) {
+    }
+
+    void on_next(T v) const {
+        auto localState = state;
+        localState->worker.schedule(make_one_and_done([=](){
+            localState->onnext(v);
+        }));
+    }
+    void on_error(std::exception_ptr e) const {
+        auto localState = state;
+        localState->worker.schedule(make_one_and_done([=](){
+            localState->onerror(e);
+        }));
+    }
+    void on_completed() const {
+        auto localState = state;
+        localState->worker.schedule(make_one_and_done([=](){
+            localState->oncompleted();
+        }));
+    }
+};
+
+template<class T, class Worker, class OnNext, class OnError, class OnCompleted>
+auto make_scheduled_subscriber(Worker w, composite_subscription f, composite_subscription t, OnNext n, OnError e, OnCompleted c)
+    -> decltype(make_subscriber<T>(composite_subscription(), make_observer<T>(*(scheduled_subscriber<T, Worker, OnNext, OnError, OnCompleted>*)nullptr))) {
+    auto scrbr = std::make_shared<scheduled_subscriber_state<T, Worker, OnNext, OnError, OnCompleted>>(w, f, t, n, e, c);
+    return make_subscriber<T>(scrbr->from, make_observer<T>(scheduled_subscriber<T, Worker, OnNext, OnError, OnCompleted>(scrbr)));
+}
+
+template<class T, class Observable, class Scheduler>
 struct concat
     : public operator_base<rxu::value_type_t<rxu::decay_t<T>>>
 {
-    typedef concat<T, Observable, Coordination> this_type;
+    typedef concat<T, Observable, Scheduler> this_type;
 
     typedef rxu::decay_t<T> source_value_type;
     typedef rxu::decay_t<Observable> source_type;
-    typedef rxu::decay_t<Coordination> coordination_type;
+    typedef rxu::decay_t<Scheduler> scheduler_type;
 
-    typedef typename coordination_type::coordinator_type coordinator_type;
-
+    typedef typename scheduler_type::worker_type worker_type;
     typedef typename source_type::source_operator_type source_operator_type;
     typedef source_value_type collection_type;
     typedef typename collection_type::value_type value_type;
 
     struct values
     {
-        values(source_operator_type o, coordination_type sf)
+        values(source_operator_type o, scheduler_type sc)
             : source_operator(std::move(o))
-            , coordination(std::move(sf))
+            , scheduler(std::move(sc))
         {
         }
         source_operator_type source_operator;
-        coordination_type coordination;
+        scheduler_type scheduler;
     };
     values initial;
 
-    concat(const source_type& o, coordination_type sf)
-        : initial(o.source_operator, std::move(sf))
+    concat(const source_type& o, scheduler_type sc)
+        : initial(o.source_operator, std::move(sc))
     {
     }
 
@@ -56,12 +145,12 @@ struct concat
             : public std::enable_shared_from_this<concat_state_type>
             , public values
         {
-            concat_state_type(values i, coordinator_type coor, output_type oarg)
+            concat_state_type(values i, worker_type w, output_type oarg)
                 : values(i)
                 , source(i.source_operator)
                 , sourceLifetime(composite_subscription::empty())
                 , collectionLifetime(composite_subscription::empty())
-                , coordinator(std::move(coor))
+                , worker(std::move(w))
                 , out(std::move(oarg))
             {
             }
@@ -70,30 +159,16 @@ struct concat
             {
                 auto state = this->shared_from_this();
 
-                collectionLifetime = composite_subscription();
-
-                // when the out observer is unsubscribed all the
-                // inner subscriptions are unsubscribed as well
-                auto innercstoken = state->out.add(collectionLifetime);
-
-                collectionLifetime.add(make_subscription([state, innercstoken](){
-                    state->out.remove(innercstoken);
-                }));
-
-                auto selectedSource = on_exception(
-                    [&](){return state->coordinator.in(std::move(st));},
-                    state->out);
-                if (selectedSource.empty()) {
-                    return;
-                }
+                state->collectionLifetime = composite_subscription();
 
                 // this subscribe does not share the out subscription
                 // so that when it is unsubscribed the out will continue
-                auto sinkInner = make_subscriber<value_type>(
-                    state->out,
-                    collectionLifetime,
+                st.subscribe(make_scheduled_subscriber<value_type>(
+                    state->worker,
+                    state->collectionLifetime,
+                    state->out.get_subscription(),
                 // on_next
-                    [state, st](value_type ct) {
+                    [state](value_type ct) {
                         state->out.on_next(ct);
                     },
                 // on_error
@@ -111,47 +186,30 @@ struct concat
                             state->out.on_completed();
                         }
                     }
-                );
-                auto selectedSinkInner = on_exception(
-                    [&](){return state->coordinator.out(sinkInner);},
-                    state->out);
-                if (selectedSinkInner.empty()) {
-                    return;
-                }
-                selectedSource->subscribe(std::move(selectedSinkInner.get()));
+                ));
             }
             observable<source_value_type, source_operator_type> source;
             composite_subscription sourceLifetime;
             composite_subscription collectionLifetime;
             std::deque<collection_type> selectedCollections;
-            coordinator_type coordinator;
+            worker_type worker;
             output_type out;
         };
 
-        auto coordinator = initial.coordination.create_coordinator(scbr.get_subscription());
+        auto worker = initial.scheduler.create_worker(scbr.get_subscription());
 
         // take a copy of the values for each subscription
-        auto state = std::make_shared<concat_state_type>(initial, std::move(coordinator), std::move(scbr));
+        auto state = std::make_shared<concat_state_type>(initial, std::move(worker), std::move(scbr));
 
         state->sourceLifetime = composite_subscription();
-
-        // when the out observer is unsubscribed all the
-        // inner subscriptions are unsubscribed as well
-        state->out.add(state->sourceLifetime);
-
-        auto source = on_exception(
-            [&](){return state->coordinator.in(state->source);},
-            state->out);
-        if (source.empty()) {
-            return;
-        }
 
         // this subscribe does not share the observer subscription
         // so that when it is unsubscribed the observer can be called
         // until the inner subscriptions have finished
-        auto sink = make_subscriber<collection_type>(
-            state->out,
+        state->source.subscribe(make_scheduled_subscriber<T>(
+            state->worker,
             state->sourceLifetime,
+            state->out.get_subscription(),
         // on_next
             [state](collection_type st) {
                 if (state->collectionLifetime.is_subscribed()) {
@@ -170,43 +228,41 @@ struct concat
                     state->out.on_completed();
                 }
             }
-        );
-        auto selectedSink = on_exception(
-            [&](){return state->coordinator.out(sink);},
-            state->out);
-        if (selectedSink.empty()) {
-            return;
-        }
-        source->subscribe(std::move(selectedSink.get()));
+        ));
     }
 };
 
-template<class Coordination>
+template<class Scheduler>
 class concat_factory
 {
-    typedef rxu::decay_t<Coordination> coordination_type;
+    typedef rxu::decay_t<Scheduler> scheduler_type;
 
-    coordination_type coordination;
+    scheduler_type scheduler;
 public:
-    concat_factory(coordination_type sf)
-        : coordination(std::move(sf))
+    concat_factory(scheduler_type sc)
+        : scheduler(std::move(sc))
     {
     }
 
     template<class Observable>
     auto operator()(Observable source)
-        ->      observable<rxu::value_type_t<concat<rxu::value_type_t<Observable>, Observable, Coordination>>,  concat<rxu::value_type_t<Observable>, Observable, Coordination>> {
-        return  observable<rxu::value_type_t<concat<rxu::value_type_t<Observable>, Observable, Coordination>>,  concat<rxu::value_type_t<Observable>, Observable, Coordination>>(
-                                                                                                                concat<rxu::value_type_t<Observable>, Observable, Coordination>(std::move(source), coordination));
+        ->      observable<rxu::value_type_t<concat<rxu::value_type_t<Observable>, Observable, Scheduler>>,  concat<rxu::value_type_t<Observable>, Observable, Scheduler>> {
+        return  observable<rxu::value_type_t<concat<rxu::value_type_t<Observable>, Observable, Scheduler>>,  concat<rxu::value_type_t<Observable>, Observable, Scheduler>>(
+                                                                                                             concat<rxu::value_type_t<Observable>, Observable, Scheduler>(std::move(source), scheduler));
     }
 };
 
 }
 
-template<class Coordination>
-auto concat(Coordination&& sf)
-    ->      detail::concat_factory<Coordination> {
-    return  detail::concat_factory<Coordination>(std::forward<Coordination>(sf));
+template<class Scheduler>
+auto concat(Scheduler&& sc)
+    ->      detail::concat_factory<Scheduler> {
+    return  detail::concat_factory<Scheduler>(std::forward<Scheduler>(sc));
+}
+
+auto concat()
+    ->      decltype(concat(rxsc::make_immediate())) {
+    return  concat(rxsc::make_immediate());
 }
 
 }

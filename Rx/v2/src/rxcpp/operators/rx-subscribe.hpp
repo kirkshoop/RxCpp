@@ -77,8 +77,8 @@ class dynamic_factory
 public:
     template<class Observable>
     auto operator()(Observable&& source)
-        ->      observable<rxu::value_type_t<rxu::decay_t<Observable>>> {
-        return  observable<rxu::value_type_t<rxu::decay_t<Observable>>>(std::forward<Observable>(source));
+        ->      decltype(source.as_dynamic()) {
+        return  source.as_dynamic();
     }
 };
 
@@ -87,6 +87,25 @@ public:
 inline auto as_dynamic()
     ->      detail::dynamic_factory {
     return  detail::dynamic_factory();
+}
+
+namespace detail {
+
+class blocking_factory
+{
+public:
+    template<class Observable>
+    auto operator()(Observable&& source)
+        ->      decltype(source.as_blocking()) {
+        return  source.as_blocking();
+    }
+};
+
+}
+
+inline auto as_blocking()
+    ->      detail::blocking_factory {
+    return  detail::blocking_factory();
 }
 
 }

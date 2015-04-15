@@ -11,70 +11,67 @@ namespace rxcpp {
 
 namespace schedulers {
 
-struct immediate : public scheduler_interface
+struct immediate
 {
+    typedef scheduler_base::clock_type clock_type;
 private:
-    typedef immediate this_type;
-    immediate(const this_type&);
-
-    struct immediate_worker : public worker_interface
+    struct immediate_worker
     {
+        typedef scheduler_base::clock_type clock_type;
     private:
-        typedef immediate_worker this_type;
-        immediate_worker(const this_type&);
+        mutable composite_subscription cs;
     public:
-        virtual ~immediate_worker()
-        {
-        }
-        immediate_worker()
+        explicit immediate_worker(composite_subscription cs)
+            : cs(std::move(cs))
         {
         }
 
-        virtual clock_type::time_point now() const {
+        clock_type::time_point now() const {
             return clock_type::now();
         }
 
-        virtual void schedule(const schedulable& scbl) const {
-            if (scbl.is_subscribed()) {
-                // allow recursion
-                recursion r(true);
-                scbl(r.get_recurse());
+        composite_subscription& get_subscription() const {
+            return cs;
+        }
+
+        template<class F>
+        void schedule(action<F> act) const {
+            action_result r;
+            auto w = make_worker(*this);
+            while (cs.is_subscribed() && r.verb != action_verb::exit) {
+                r = act(w);
+                if (r.verb == action_verb::repeat_when) {
+                    std::this_thread::sleep_until(r.when);
+                }
             }
         }
 
-        virtual void schedule(clock_type::time_point when, const schedulable& scbl) const {
-            std::this_thread::sleep_until(when);
-            if (scbl.is_subscribed()) {
-                // allow recursion
-                recursion r(true);
-                scbl(r.get_recurse());
+        template<class F>
+        void schedule(clock_type::time_point when, action<F> act) const {
+            action_result r(when);
+            auto w = make_worker(*this);
+            while (cs.is_subscribed() && r.verb != action_verb::exit) {
+                if (r.verb == action_verb::repeat_when) {
+                    std::this_thread::sleep_until(r.when);
+                }
+                r = act(w);
             }
         }
     };
 
-    std::shared_ptr<immediate_worker> wi;
-
 public:
-    immediate()
-        : wi(std::make_shared<immediate_worker>())
-    {
-    }
-    virtual ~immediate()
-    {
-    }
 
-    virtual clock_type::time_point now() const {
+    clock_type::time_point now() const {
         return clock_type::now();
     }
 
-    virtual worker create_worker(composite_subscription cs) const {
-        return worker(std::move(cs), wi);
+    auto create_worker(composite_subscription cs) const -> worker<immediate_worker> {
+        return make_worker(immediate_worker(std::move(cs)));
     }
 };
 
-inline const scheduler& make_immediate() {
-    static scheduler instance = make_scheduler<immediate>();
-    return instance;
+inline auto make_immediate() -> scheduler<immediate> {
+    return scheduler<immediate>(immediate());
 }
 
 }

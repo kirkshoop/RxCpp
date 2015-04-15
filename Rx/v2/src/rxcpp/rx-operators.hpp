@@ -34,6 +34,7 @@ namespace rxo=operators;
 
 }
 
+#if 0
 #include "operators/rx-buffer_count.hpp"
 #include "operators/rx-buffer_time.hpp"
 #include "operators/rx-buffer_time_count.hpp"
@@ -70,4 +71,13 @@ namespace rxo=operators;
 #include "operators/rx-window_time.hpp"
 #include "operators/rx-window_time_count.hpp"
 #include "operators/rx-zip.hpp"
+#else
+#include "operators/rx-concat.hpp"
+#include "operators/rx-filter.hpp"
+#include "operators/rx-lift.hpp"
+#include "operators/rx-map.hpp"
+#include "operators/rx-subscribe.hpp"
+
+#endif
+
 #endif

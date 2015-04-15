@@ -124,6 +124,13 @@ struct value_type_from<T, typename types_checked_from<value_type_t<T>>::type>
     : public std::true_type {typedef value_type_t<T> type;};
 
 
+template<class L, class R, class C = types_checked>
+struct not_same {};
+
+template<class L, class R>
+struct not_same<L, R, typename types_checked_from<
+    typename std::enable_if<!std::is_same<decay_t<L>, decay_t<R>>::value, L>::type>::type> {};
+
 
 namespace detail {
 

@@ -41,12 +41,12 @@ inline std::ostream& operator<< (std::ostream& os, const trace_id& id) {
 
 struct trace_noop
 {
-    template<class Worker, class Schedulable>
-    inline void schedule_enter(const Worker&, const Schedulable&) {}
+    template<class Worker>
+    inline void schedule_enter(const Worker&) {}
     template<class Worker>
     inline void schedule_return(const Worker&) {}
-    template<class Worker, class When, class Schedulable>
-    inline void schedule_when_enter(const Worker&, const When&, const Schedulable&) {}
+    template<class Worker, class When>
+    inline void schedule_when_enter(const Worker&, const When&) {}
     template<class Worker>
     inline void schedule_when_return(const Worker&) {}
 

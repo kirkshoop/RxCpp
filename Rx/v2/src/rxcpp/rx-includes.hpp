@@ -138,13 +138,12 @@
 #include "rx-scheduler.hpp"
 #include "rx-subscriber.hpp"
 #include "rx-notification.hpp"
-#include "rx-coordination.hpp"
 #include "rx-sources.hpp"
-#include "rx-subjects.hpp"
+//#include "rx-subjects.hpp"
 #include "rx-operators.hpp"
 #include "rx-observable.hpp"
-#include "rx-connectable_observable.hpp"
-#include "rx-grouped_observable.hpp"
+//#include "rx-connectable_observable.hpp"
+//#include "rx-grouped_observable.hpp"
 
 #pragma pop_macro("min")
 #pragma pop_macro("max")

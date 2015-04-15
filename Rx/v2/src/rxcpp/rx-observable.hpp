@@ -183,7 +183,10 @@ struct defer_observable
 */
 template<class T, class Observable>
 class blocking_observable
+    : public observable_base<T>
 {
+    typedef blocking_observable<T, Observable> this_type;
+
     template<class Obsvbl, class... ArgN>
     static auto blocking_subscribe(const Obsvbl& source, ArgN&&... an)
         -> composite_subscription {
@@ -248,6 +251,33 @@ public:
     blocking_observable(observable_type s) : source(std::move(s)) {}
 
     ///
+    /// takes any function that will take this observable and produce a result value.
+    /// this is intended to allow externally defined operators, that use subscribe,
+    /// to be connected into the expression.
+    ///
+    template<class OperatorFactory>
+    auto op(OperatorFactory&& of) const
+        -> decltype(of(*(const this_type*)nullptr)) {
+        return      of(*this);
+        static_assert(detail::is_operator_factory_for<this_type, OperatorFactory>::value, "Function passed for op() must have the signature Result(SourceObservable)");
+    }
+
+#if 0
+    ///
+    /// takes any function that will take a subscriber for this observable and produce a subscriber.
+    /// this is intended to allow externally defined operators, that use make_subscriber, to be connected
+    /// into the expression.
+    ///
+    template<class ResultType, class Operator>
+    auto lift(Operator&& op) const
+        ->      blocking_observable<rxu::value_type_t<rxo::detail::lift_operator<ResultType, source_operator_type, Operator>>, rxo::detail::lift_operator<ResultType, source_operator_type, Operator>> {
+        return  blocking_observable<rxu::value_type_t<rxo::detail::lift_operator<ResultType, source_operator_type, Operator>>, rxo::detail::lift_operator<ResultType, source_operator_type, Operator>>(
+                                                                                                                      rxo::detail::lift_operator<ResultType, source_operator_type, Operator>(source_operator, std::forward<Operator>(op)));
+        static_assert(detail::is_lift_function_for<T, subscriber<ResultType>, Operator>::value, "Function passed for lift() must have the signature subscriber<...>(subscriber<T, ...>)");
+    }
+#endif
+
+    ///
     /// subscribe will cause this observable to emit values to the provided subscriber.
     /// callers must provide enough arguments to make a subscriber.
     /// overrides are supported. thus
@@ -262,7 +292,7 @@ public:
         -> composite_subscription {
         return blocking_subscribe(source, std::forward<ArgN>(an)...);
     }
-
+#if 0
     T first() {
         rxu::maybe<T> result;
         composite_subscription cs;
@@ -287,6 +317,7 @@ public:
     double average() const {
         return source.average().as_blocking().last();
     }
+#endif
 };
 
 template<>
@@ -361,6 +392,7 @@ private:
             }
         };
 
+#if 0
         // make sure to let current_thread take ownership of the thread as early as possible.
         if (rxsc::current_thread::is_schedule_required()) {
             const auto& sc = rxsc::make_current_thread();
@@ -368,7 +400,9 @@ private:
                 [&](const rxsc::schedulable&) {
                     safe_subscribe();
                 });
-        } else {
+        } else
+#endif
+        {
             // current_thread already owns this thread.
             safe_subscribe();
         }
@@ -456,6 +490,7 @@ public:
         static_assert(detail::is_lift_function_for<T, subscriber<ResultType>, Operator>::value, "Function passed for lift() must have the signature subscriber<...>(subscriber<T, ...>)");
     }
 
+#if 0
     ///
     /// takes any function that will take a subscriber for this observable and produce a subscriber.
     /// this is intended to allow externally defined operators, that use make_subscriber, to be connected
@@ -479,6 +514,7 @@ public:
             decltype(rxs::from<ResultType>())>::type {
         return       rxs::from<ResultType>();
     }
+#endif
 
     ///
     /// subscribe will cause this observable to emit values to the provided subscriber.
@@ -496,6 +532,7 @@ public:
         return detail_subscribe(make_subscriber<T>(std::forward<ArgN>(an)...));
     }
 
+#if 0
     /// filter (AKA Where) ->
     /// for each item from this observable use Predicate to select which items to emit from the new observable that is returned.
     ///
@@ -1342,8 +1379,10 @@ public:
         -> decltype(EXPLICIT_THIS lift<rxu::value_type_t<rxo::detail::pairwise<T>>>(rxo::detail::pairwise<T>())) {
         return                    lift<rxu::value_type_t<rxo::detail::pairwise<T>>>(rxo::detail::pairwise<T>());
     }
+#endif
 };
 
+#if 0
 template<class T, class SourceOperator>
 auto observable<T, SourceOperator>::last() const
     -> observable<T> {
@@ -1362,6 +1401,7 @@ auto observable<T, SourceOperator>::count() const
     -> observable<int> {
     return this->reduce(0, [](int current, const T&){return ++current;}, [](int result){return result;});
 }
+#endif
 
 template<class T, class SourceOperator>
 inline bool operator==(const observable<T, SourceOperator>& lhs, const observable<T, SourceOperator>& rhs) {
@@ -1438,6 +1478,7 @@ public:
         -> decltype(rxs::create<T>(std::move(os))) {
         return      rxs::create<T>(std::move(os));
     }
+#if 0
     /*! Returns an observable that sends values in the range first-last by adding step to the previous value.
 
         \tparam T  the type of the values that this observable emits
@@ -1585,6 +1626,7 @@ public:
         -> decltype(rxs::scope(std::move(rf), std::move(of))) {
         return      rxs::scope(std::move(rf), std::move(of));
     }
+#endif
 };
 
 
@@ -1599,6 +1641,11 @@ auto operator >> (const rxcpp::observable<T, SourceOperator>& source, OperatorFa
     -> decltype(source.op(std::forward<OperatorFactory>(of))) {
     return      source.op(std::forward<OperatorFactory>(of));
 }
+template<class T, class Observable, class OperatorFactory>
+auto operator >> (const rxcpp::blocking_observable<T, Observable>& source, OperatorFactory&& of)
+    -> decltype(source.op(std::forward<OperatorFactory>(of))) {
+    return      source.op(std::forward<OperatorFactory>(of));
+}
 
 //
 // support range() | filter() | subscribe() syntax
@@ -1606,6 +1653,11 @@ auto operator >> (const rxcpp::observable<T, SourceOperator>& source, OperatorFa
 //
 template<class T, class SourceOperator, class OperatorFactory>
 auto operator | (const rxcpp::observable<T, SourceOperator>& source, OperatorFactory&& of)
+    -> decltype(source.op(std::forward<OperatorFactory>(of))) {
+    return      source.op(std::forward<OperatorFactory>(of));
+}
+template<class T, class Observable, class OperatorFactory>
+auto operator | (const rxcpp::blocking_observable<T, Observable>& source, OperatorFactory&& of)
     -> decltype(source.op(std::forward<OperatorFactory>(of))) {
     return      source.op(std::forward<OperatorFactory>(of));
 }
