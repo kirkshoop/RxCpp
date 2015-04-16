@@ -30,10 +30,17 @@ public:
     };
 
 private:
-    static current_thread_queue_type*& current_thread_queue() {
-        static RXCPP_THREAD_LOCAL current_thread_queue_type* queue;
+#if defined(RXCPP_THREAD_LOCAL)
+     static current_thread_queue_type*& current_thread_queue() {
+         static RXCPP_THREAD_LOCAL current_thread_queue_type* queue;
+         return queue;
+     }
+#else
+    static rxu::thread_local_storage<current_thread_queue_type>& current_thread_queue() {
+        static rxu::thread_local_storage<current_thread_queue_type> queue;
         return queue;
     }
+#endif
 
 public:
 
@@ -100,7 +107,11 @@ public:
         if (!current_thread_queue()) {
             abort();
         }
+#if defined(RXCPP_THREAD_LOCAL)
         destroy(current_thread_queue());
+#else
+        destroy(current_thread_queue().get());
+#endif
         current_thread_queue() = nullptr;
     }
 };
