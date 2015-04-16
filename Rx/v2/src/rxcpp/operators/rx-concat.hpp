@@ -20,7 +20,7 @@ struct one_and_done
     template<class W>
     auto operator()(W&) -> rxsc::action_result {
         f();
-        return rxsc::action_result();
+        return nullptr;
     }
 };
 template<class F>
@@ -33,7 +33,12 @@ template<class T, class Worker, class OnNext, class OnError, class OnCompleted>
 struct scheduled_subscriber_state : public std::enable_shared_from_this<scheduled_subscriber_state<T, Worker, OnNext, OnError, OnCompleted>>
 {
     ~scheduled_subscriber_state(){
-        from.remove(fromtoken);
+        if (!fromtoken.expired()) {
+            from.remove(fromtoken);
+        }
+        if (!totoken.expired()) {
+            to.remove(totoken);
+        }
     }
     scheduled_subscriber_state(Worker w, composite_subscription f, composite_subscription t, OnNext n, OnError e, OnCompleted c)
         : worker(w)
@@ -43,19 +48,6 @@ struct scheduled_subscriber_state : public std::enable_shared_from_this<schedule
         , onerror(e)
         , oncompleted(c)
     {
-        auto localState = this->shared_from_this();
-
-        auto disposer = make_one_and_done([=](){
-            localState->to.unsubscribe();
-        });
-
-        localState->to.add([=](){
-            localState->worker.schedule(disposer);
-        });
-
-        fromtoken = localState->from.add([=](){
-            localState->worker.schedule(disposer);
-        });
     }
 
     Worker worker;
@@ -65,6 +57,7 @@ struct scheduled_subscriber_state : public std::enable_shared_from_this<schedule
     OnError onerror;
     OnCompleted oncompleted;
     typename composite_subscription::weak_subscription fromtoken;
+    typename composite_subscription::weak_subscription totoken;
 };
 
 template<class T, class Worker, class OnNext, class OnError, class OnCompleted>
@@ -73,8 +66,7 @@ struct scheduled_subscriber
 
     std::shared_ptr<scheduled_subscriber_state<T, Worker, OnNext, OnError, OnCompleted>> state;
 
-    explicit scheduled_subscriber(std::shared_ptr<scheduled_subscriber_state<T, Worker, OnNext, OnError, OnCompleted>> s) : state(s) {
-    }
+    explicit scheduled_subscriber(std::shared_ptr<scheduled_subscriber_state<T, Worker, OnNext, OnError, OnCompleted>> s) : state(s) {}
 
     void on_next(T v) const {
         auto localState = state;
@@ -99,7 +91,22 @@ struct scheduled_subscriber
 template<class T, class Worker, class OnNext, class OnError, class OnCompleted>
 auto make_scheduled_subscriber(Worker w, composite_subscription f, composite_subscription t, OnNext n, OnError e, OnCompleted c)
     -> decltype(make_subscriber<T>(composite_subscription(), make_observer<T>(*(scheduled_subscriber<T, Worker, OnNext, OnError, OnCompleted>*)nullptr))) {
+
     auto scrbr = std::make_shared<scheduled_subscriber_state<T, Worker, OnNext, OnError, OnCompleted>>(w, f, t, n, e, c);
+
+    auto disposer = make_one_and_done([=](){
+        scrbr->from.unsubscribe();
+        scrbr->to.unsubscribe();
+    });
+
+    scrbr->totoken = scrbr->to.add([=](){
+        scrbr->worker.schedule(disposer);
+    });
+
+    scrbr->fromtoken = scrbr->from.add([=](){
+        scrbr->worker.schedule(disposer);
+    });
+
     return make_subscriber<T>(scrbr->from, make_observer<T>(scheduled_subscriber<T, Worker, OnNext, OnError, OnCompleted>(scrbr)));
 }
 
@@ -166,7 +173,7 @@ struct concat
                 st.subscribe(make_scheduled_subscriber<value_type>(
                     state->worker,
                     state->collectionLifetime,
-                    state->out.get_subscription(),
+                    composite_subscription(),
                 // on_next
                     [state](value_type ct) {
                         state->out.on_next(ct);
@@ -196,7 +203,7 @@ struct concat
             output_type out;
         };
 
-        auto worker = initial.scheduler.create_worker(scbr.get_subscription());
+        auto worker = initial.scheduler.create_worker();
 
         // take a copy of the values for each subscription
         auto state = std::make_shared<concat_state_type>(initial, std::move(worker), std::move(scbr));

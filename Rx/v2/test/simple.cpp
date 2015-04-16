@@ -8,7 +8,7 @@ namespace rxsc=rxcpp::schedulers;
 //#include "rxcpp/rx-test.hpp"
 #include "catch.hpp"
 
-const int static_onnextcalls = 10000000;
+const int static_onnextcalls = 100000000;
 
 
 SCENARIO("range", "[range][perf]"){
@@ -26,11 +26,15 @@ SCENARIO("range", "[range][perf]"){
             auto count = rx::make_subscriber<int>([&](int ){++c;});
 
             rxs::range(0, 9) |
-                rxo::filter([](int){ return true; }) |
-                rxo::map([&](int ){ return rxs::range(0, sectionCount - 1); }) |
+                rxo::map([&](int ){ return rxs::range(0, (sectionCount / 10) - 1); }) |
                 rxo::concat() |
                 rxo::as_blocking() |
-                rxo::subscribe<int>([&](int ){++c;});
+                rxo::subscribe<int>(
+                    [&](int ){++c;},
+                    [](std::exception_ptr e){
+                        try {std::rethrow_exception(e);} catch(const std::exception& ex) {std::cout << ex.what() << std::endl;}
+                    }
+                );
 
             auto finish = clock::now();
             auto msElapsed = duration_cast<milliseconds>(finish.time_since_epoch()) -
