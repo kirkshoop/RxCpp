@@ -18,19 +18,30 @@ SCENARIO("range immediate", "[range][immediate][perf]"){
             using namespace std::chrono;
             typedef steady_clock clock;
 
+            std::cout << "main    thread " << std::this_thread::get_id() << std::endl;
+
             int n = 1;
             auto sectionCount = onnextcalls;
             auto start = clock::now();
             int c = 0;
+
+            rx::composite_subscription cs;
+            cs.add([](){
+                std::cout << "dispose thread " << std::this_thread::get_id() << std::endl;
+            });
 
             rxs::range(0, 9) |
                 rxo::map([&](int ){ return rxs::range(0, (sectionCount / 10) - 1); }) |
                 rxo::concat() |
                 rxo::as_blocking() |
                 rxo::subscribe<int>(
+                    cs,
                     [&](int ){++c;},
                     [](std::exception_ptr e){
                         try {std::rethrow_exception(e);} catch(const std::exception& ex) {std::cout << ex.what() << std::endl;}
+                    },
+                    [](){
+                        std::cout << "output  thread " << std::this_thread::get_id() << std::endl;
                     }
                 );
 
@@ -96,93 +107,74 @@ SCENARIO("concat pythagorian ranges", "[range][concat][pythagorian][perf]"){
             using namespace std::chrono;
             typedef steady_clock clock;
 
-            std::cout << "main    thread " << std::this_thread::get_id() << std::endl;
+            auto test = [&](rxsc::scheduler<> sc) {
 
-            auto sc = rxsc::make_new_thread();
+                int c = 0;
+                int ct = 0;
+                int n = 1;
+                auto start = clock::now();
 
-            int c = 0;
-            int ct = 0;
-            int n = 1;
-            auto start = clock::now();
+                rx::composite_subscription cs;
+                cs.add([](){
+                    std::cout << "dispose thread " << std::this_thread::get_id() << std::endl;
+                });
 
-            rx::composite_subscription cs;
-            cs.add([](){
-                std::cout << "dispose thread " << std::this_thread::get_id() << std::endl;
-            });
+                auto triples =
+                    rxs::range(1, sc) |
+                        rxo::map(
+                            [&c, sc](int z){
+                                return rxs::range(1, z, 1, sc) |
+                                    rxo::map(
+                                        [&c, sc, z](int x){
+                                            return rxs::range(x, z, 1, sc) |
+                                                rxo::filter([&c, z, x](int y){++c; return x*x + y*y == z*z;}) |
+                                                rxo::map([z, x](int y){
+                                                    std::cout << "y       thread " << std::this_thread::get_id() << " triplet " << x << ", " << y << ", " << z << std::endl;
+                                                    return std::make_tuple(x, y, z);
+                                                }) |
+                                                // forget type to workaround lambda deduction bug on msvc 2013
+                                                rxo::as_dynamic();
+                                        }) |
+                                    rxo::concat(sc) |
+                                    // forget type to workaround lambda deduction bug on msvc 2013
+                                    rxo::as_dynamic();
+                            }) |
+                        rxo::concat(sc);
 
-            auto triples =
-                rxs::range(1, sc) |
-                    rxo::map(
-                        [&c, sc](int z){
-                            return rxs::range(1, z, 1, sc) |
-                                rxo::map(
-                                    [&c, sc, z](int x){
-                                        return rxs::range(x, z, 1, sc) |
-                                            rxo::filter([&c, z, x](int y){++c; return x*x + y*y == z*z;}) |
-                                            rxo::map([z, x](int y){
-//                                                std::cout << "y       thread " << std::this_thread::get_id() << " triplet " << x << ", " << y << ", " << z << std::endl;
-                                                return std::make_tuple(x, y, z);
-                                            }) |
-#if 0
-                                            rxo::finally([](){
-                                                std::cout << "y       thread " << std::this_thread::get_id() << std::endl;
-                                            }) |
-#endif
-                                            // forget type to workaround lambda deduction bug on msvc 2013
-                                            rxo::as_dynamic();
-                                    }) |
-#if 0
-                                rxo::finally([](){
-                                    std::cout << "x       thread " << std::this_thread::get_id() << std::endl;
-                                }) |
-#endif
-                                rxo::concat(sc) |
-#if 0
-                                rxo::filter(rxu::apply_to([](int x, int y, int z){
-                                    std::cout << "x out   thread " << std::this_thread::get_id() << " triplet " << x << ", " << y << ", " << z << std::endl;
-                                    return true;
-                                })) |
-                                rxo::finally([](){
-                                    std::cout << "x out   thread " << std::this_thread::get_id() << std::endl;
-                                }) |
-#endif
-                                // forget type to workaround lambda deduction bug on msvc 2013
-                                rxo::as_dynamic();
-                        }) |
-#if 0
-                    rxo::finally([](){
-                        std::cout << "z       thread " << std::this_thread::get_id() << std::endl;
-                    }) |
-#endif
-                    rxo::concat(sc);
-#if 0
-                    rxo::filter(rxu::apply_to([](int x, int y, int z){
-                        std::cout << "z out   thread " << std::this_thread::get_id() << " triplet " << x << ", " << y << ", " << z << std::endl;
-                        return true;
-                    })) |
-                    rxo::finally([](){
-                        std::cout << "z out   thread " << std::this_thread::get_id() << std::endl;
-                    });
-#endif
+                triples |
+                    rxo::take(tripletCount) |
+                    rxo::as_blocking() |
+                    rxo::subscribe<std::tuple<int, int, int>>(
+                        cs,
+                        rxu::apply_to([&ct](int /*x*/,int /*y*/,int /*z*/){++ct;}),
+                        [](std::exception_ptr e){
+                            try {std::rethrow_exception(e);} catch(const std::exception& ex) {std::cout << ex.what() << std::endl;}
+                        },
+                        [](){
+                            std::cout << "output  thread " << std::this_thread::get_id() << std::endl;
+                        });
 
-            triples |
-                rxo::take(tripletCount) |
-                rxo::as_blocking() |
-                rxo::subscribe<std::tuple<int, int, int>>(
-                    cs,
-                    rxu::apply_to([&ct](int /*x*/,int /*y*/,int /*z*/){++ct;}),
-                    [](std::exception_ptr e){
-                        try {std::rethrow_exception(e);} catch(const std::exception& ex) {std::cout << ex.what() << std::endl;}
-                    },
-                    [](){
-                        std::cout << "output  thread " << std::this_thread::get_id() << std::endl;
-                    });
+                auto finish = clock::now();
+                auto msElapsed = duration_cast<milliseconds>(finish.time_since_epoch()) -
+                       duration_cast<milliseconds>(start.time_since_epoch());
+                std::cout << "concat pythagorian range : " << n << " subscribed, " << c << " filtered to, " << ct << " triplets, " << msElapsed.count() << "ms elapsed " << c / (msElapsed.count() / 1000.0) << " ops/sec" << std::endl;
+            };
 
-            auto finish = clock::now();
-            auto msElapsed = duration_cast<milliseconds>(finish.time_since_epoch()) -
-                   duration_cast<milliseconds>(start.time_since_epoch());
-            std::cout << "concat pythagorian range : " << n << " subscribed, " << c << " filtered to, " << ct << " triplets, " << msElapsed.count() << "ms elapsed " << c / (msElapsed.count() / 1000.0) << " ops/sec" << std::endl;
+            THEN("new thread completes") {
+                std::cout << "main    thread " << std::this_thread::get_id() << std::endl;
 
+                auto sc = rxsc::make_new_thread();
+
+                test(sc);
+            }
+
+            THEN("immediate completes") {
+                std::cout << "main    thread " << std::this_thread::get_id() << std::endl;
+
+                auto sc = rxsc::make_immediate();
+
+                test(sc);
+            }
         }
     }
 }

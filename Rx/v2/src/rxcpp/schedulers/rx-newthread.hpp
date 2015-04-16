@@ -134,13 +134,11 @@ private:
             return state->lifetime;
         }
 
-        template<class F>
-        void schedule(action<F> act) const {
+        void schedule(action<> act) const {
             schedule(now(), act);
         }
 
-        template<class F>
-        void schedule(clock_type::time_point when, action<F> act) const {
+        void schedule(clock_type::time_point when, action<> act) const {
             if (act) {
                 std::unique_lock<std::mutex> guard(state->lock);
                 state->queue.push(new_worker_state::item_type(when, act));
@@ -167,7 +165,7 @@ public:
         return clock_type::now();
     }
 
-    auto create_worker(composite_subscription cs) const -> worker<new_worker> {
+    auto create_worker(composite_subscription cs) const -> worker<> {
         return make_worker(new_worker(std::move(cs), factory));
     }
 };

@@ -549,7 +549,7 @@ public:
     explicit inner_scheduler(I&& i) : inner(std::forward<I>(i)) {
     }
 
-    virtual clock_type::time_point now() {
+    virtual clock_type::time_point now() const {
         return inner.now();
     }
 
@@ -593,6 +593,7 @@ class scheduler<void> : public scheduler_base
     friend bool operator==(const scheduler&, const scheduler&);
 public:
     typedef scheduler_base::clock_type clock_type;
+    typedef worker<> worker_type;
 
     scheduler()
     {
@@ -641,6 +642,7 @@ class scheduler : public scheduler_base
 {
     Inner inner;
     friend bool operator==(const scheduler&, const scheduler&);
+    friend class scheduler<>;
 public:
     typedef scheduler_base::clock_type clock_type;
     typedef decltype(((Inner*)nullptr)->create_worker(composite_subscription())) worker_type;
