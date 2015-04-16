@@ -355,15 +355,15 @@ public:
     //
 
     /// insert the supplied action to be run at the time specified
-    template<class Action>
-    void schedule(Action act) const {
-        schedule(make_action(act));
+    template<class F, class NotAction = typename not_action<F>::type>
+    void schedule(F f) const {
+        schedule(make_action(f));
     }
 
     /// insert the supplied action to be run at the time specified
-    template<class Action>
-    void schedule(clock_type::time_point when, Action act) const {
-        schedule(when, make_action(act));
+    template<class F, class NotAction = typename not_action<F>::type>
+    void schedule(clock_type::time_point when, F f) const {
+        schedule(when, make_action(f));
     }
 
     /// insert the supplied action to be run at now() + the delay specified
@@ -462,15 +462,15 @@ public:
     //
 
     /// insert the supplied action to be run at the time specified
-    template<class Action>
-    void schedule(Action act) const {
-        schedule(make_action(act));
+    template<class F, class NotAction = typename not_action<F>::type>
+    void schedule(F f) const {
+        schedule(make_action(f));
     }
 
     /// insert the supplied action to be run at the time specified
-    template<class Action>
-    void schedule(clock_type::time_point when, Action act) const {
-        schedule(when, make_action(act));
+    template<class F, class NotAction = typename not_action<F>::type>
+    void schedule(clock_type::time_point when, F f) const {
+        schedule(when, make_action(f));
     }
 
     /// insert the supplied action to be run at now() + the delay specified
