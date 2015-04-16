@@ -117,7 +117,7 @@ public:
     {
     }
 
-    explicit operator bool () { return !!function; }
+    explicit operator bool () const { return !!function; }
     action& operator=(std::nullptr_t) { function = nullptr; return *this; }
 
     /// call the function
@@ -125,6 +125,12 @@ public:
         return function(s);
     }
     action_result operator()(worker<>& s) {
+        return function(s);
+    }
+    action_result operator()(worker<>&& s) const {
+        return function(s);
+    }
+    action_result operator()(worker<>&& s) {
         return function(s);
     }
 };
@@ -148,7 +154,7 @@ public:
     {
     }
 
-    explicit operator bool () { return true; }
+    explicit operator bool () const { return true; }
 
     /// call the function
     template<class I>
@@ -157,6 +163,14 @@ public:
     }
     template<class I>
     action_result operator()(worker<I>& s) {
+        return function(s);
+    }
+    template<class I>
+    action_result operator()(worker<I>&& s) const {
+        return function(s);
+    }
+    template<class I>
+    action_result operator()(worker<I>&& s) {
         return function(s);
     }
 };
@@ -199,10 +213,9 @@ class inner_worker : public worker_interface
 {
 public:
     template<class I>
-    explicit inner_worker(I&& i) : inner(std::forward<I>(i)) {
-    }
+    explicit inner_worker(I&& i) : inner(std::forward<I>(i)) {}
 
-    virtual clock_type::time_point now() {
+    virtual clock_type::time_point now() const {
         return inner.now();
     }
 
@@ -289,7 +302,7 @@ public:
     {
     }
 
-    explicit operator bool () { return !!inner; }
+    explicit operator bool () const { return !!inner; }
     worker& operator=(std::nullptr_t) { inner = nullptr; return *this; }
 
     inline const composite_subscription& get_subscription() const {
@@ -386,6 +399,7 @@ class worker : public worker_base
     worker();
     Inner inner;
     friend bool operator==(const worker&, const worker&);
+    friend class worker<void>;
 public:
     typedef scheduler_base::clock_type clock_type;
     typedef composite_subscription::weak_subscription weak_subscription;
@@ -394,7 +408,7 @@ public:
         class NotWorker = typename not_worker<I>::type>
     worker(I&& i) : inner(std::forward<I>(i)) {}
 
-    explicit operator bool () { return true; }
+    explicit operator bool () const { return true; }
 
     inline const composite_subscription& get_subscription() const {
         return inner.get_subscription();
@@ -507,7 +521,7 @@ auto make_worker(I&& i) -> worker<rxu::decay_t<I>> {
 
 template<class I>
 auto make_worker(worker<I> i) -> worker<I> {
-    return worker<>(std::move(i));
+    return worker<I>(std::move(i));
 }
 
 namespace detail {
@@ -599,7 +613,7 @@ public:
     {
     }
 
-    explicit operator bool () { return !!inner; }
+    explicit operator bool () const { return !!inner; }
     scheduler& operator=(std::nullptr_t) { inner = nullptr; return *this; }
 
     /// return the current time for this scheduler
@@ -635,7 +649,7 @@ public:
         class NotScheduler = typename not_scheduler<I>::type>
     scheduler(I&& i) : inner(std::forward<I>(i)) {}
 
-    explicit operator bool () { return true; }
+    explicit operator bool () const { return true; }
 
     /// return the current time for this scheduler
     inline clock_type::time_point now() const {
@@ -745,8 +759,9 @@ namespace rxsc=schedulers;
 
 }
 
+#include "schedulers/rx-action_queue.hpp"
 //#include "schedulers/rx-currentthread.hpp"
-//#include "schedulers/rx-newthread.hpp"
+#include "schedulers/rx-newthread.hpp"
 //#include "schedulers/rx-eventloop.hpp"
 #include "schedulers/rx-immediate.hpp"
 //#include "schedulers/rx-virtualtime.hpp"

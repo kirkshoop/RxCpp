@@ -88,15 +88,18 @@ struct scheduled_subscriber
     }
 };
 
-template<class T, class Worker, class OnNext, class OnError, class OnCompleted>
-auto make_scheduled_subscriber(Worker w, composite_subscription f, composite_subscription t, OnNext n, OnError e, OnCompleted c)
+template<class T, class Worker, class OnNext, class OnError, class OnCompleted, class Finally>
+auto make_scheduled_subscriber(Worker w, composite_subscription f, composite_subscription t, OnNext n, OnError e, OnCompleted c, Finally fin)
     -> decltype(make_subscriber<T>(composite_subscription(), make_observer<T>(*(scheduled_subscriber<T, Worker, OnNext, OnError, OnCompleted>*)nullptr))) {
 
     auto scrbr = std::make_shared<scheduled_subscriber_state<T, Worker, OnNext, OnError, OnCompleted>>(w, f, t, n, e, c);
 
     auto disposer = make_one_and_done([=](){
-        scrbr->from.unsubscribe();
-        scrbr->to.unsubscribe();
+        if (fin()) {
+            scrbr->from.unsubscribe();
+            scrbr->to.unsubscribe();
+            scrbr->worker.unsubscribe();
+        }
     });
 
     scrbr->totoken = scrbr->to.add([=](){
@@ -159,6 +162,7 @@ struct concat
                 , collectionLifetime(composite_subscription::empty())
                 , worker(std::move(w))
                 , out(std::move(oarg))
+                , pending(0)
             {
             }
 
@@ -168,12 +172,14 @@ struct concat
 
                 state->collectionLifetime = composite_subscription();
 
+                ++state->pending;
+
                 // this subscribe does not share the out subscription
                 // so that when it is unsubscribed the out will continue
                 st.subscribe(make_scheduled_subscriber<value_type>(
                     state->worker,
                     state->collectionLifetime,
-                    composite_subscription(),
+                    state->out.get_subscription(),
                 // on_next
                     [state](value_type ct) {
                         state->out.on_next(ct);
@@ -192,6 +198,10 @@ struct concat
                         } else if (!state->sourceLifetime.is_subscribed()) {
                             state->out.on_completed();
                         }
+                    },
+                // finally
+                    [state](){
+                        return --state->pending == 0;
                     }
                 ));
             }
@@ -201,6 +211,7 @@ struct concat
             std::deque<collection_type> selectedCollections;
             worker_type worker;
             output_type out;
+            int pending;
         };
 
         auto worker = initial.scheduler.create_worker();
@@ -209,6 +220,8 @@ struct concat
         auto state = std::make_shared<concat_state_type>(initial, std::move(worker), std::move(scbr));
 
         state->sourceLifetime = composite_subscription();
+
+        ++state->pending;
 
         // this subscribe does not share the observer subscription
         // so that when it is unsubscribed the observer can be called
@@ -234,6 +247,10 @@ struct concat
                 if (!state->collectionLifetime.is_subscribed() && state->selectedCollections.empty()) {
                     state->out.on_completed();
                 }
+            },
+        // finally
+            [state](){
+                return --state->pending == 0;
             }
         ));
     }
