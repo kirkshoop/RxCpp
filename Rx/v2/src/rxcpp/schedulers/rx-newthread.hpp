@@ -37,14 +37,13 @@ private:
             ~new_worker_state()
             {
                 std::unique_lock<std::mutex> guard(lock);
-                if (worker.joinable() && worker.get_id() != std::this_thread::get_id()) {
-                    lifetime.unsubscribe();
+                lifetime.unsubscribe();
+                if (worker.get_id() != std::this_thread::get_id()) {
+                    auto local = std::move(worker);
                     guard.unlock();
-                    worker.join();
-                }
-                else {
-                    lifetime.unsubscribe();
-                    worker.detach();
+                    if (local.joinable()) {
+                        local.join();
+                    }
                 }
             }
 
@@ -84,8 +83,13 @@ private:
                 // take ownership
                 queue_type::ensure(w);
                 // release ownership
-                RXCPP_UNWIND_AUTO([]{
+                RXCPP_UNWIND_AUTO([&]{
                     queue_type::destroy();
+                    if (keepAlive->worker.joinable()) {
+                        //std::cout << "detach " << std::endl;
+                        keepAlive->worker.detach();
+                    }
+                    //std::cout << "exit " << std::this_thread::get_id() << std::endl;
                 });
 
                 for(;;) {
