@@ -95,7 +95,8 @@ auto make_scheduled_subscriber(Worker w, composite_subscription f, composite_sub
     auto scrbr = std::make_shared<scheduled_subscriber_state<T, Worker, OnNext, OnError, OnCompleted>>(w, f, t, n, e, c);
 
     auto disposer = make_one_and_done([=](){
-        if (fin()) {
+        auto done = fin() || !scrbr->to.is_subscribed();
+        if (done) {
             scrbr->from.unsubscribe();
             scrbr->to.unsubscribe();
             scrbr->worker.unsubscribe();
@@ -190,6 +191,7 @@ struct concat
                     },
                 //on_completed
                     [state](){
+                        if (!state->out.is_subscribed()) {return;}
                         if (!state->selectedCollections.empty()) {
                             auto value = state->selectedCollections.front();
                             state->selectedCollections.pop_front();
@@ -232,6 +234,7 @@ struct concat
             state->out.get_subscription(),
         // on_next
             [state](collection_type st) {
+                if (!state->out.is_subscribed()) {return;}
                 if (state->collectionLifetime.is_subscribed()) {
                     state->selectedCollections.push_back(st);
                 } else if (state->selectedCollections.empty()) {
