@@ -565,7 +565,7 @@ template<class Inner,
         class NotInterface = rxu::not_same<Inner, detail::scheduler_interface_ptr>,
         class NotConstInterface = rxu::not_same<Inner, detail::const_scheduler_interface_ptr>>
 auto make_inner_scheduler(Inner&& i) -> detail::scheduler_interface_ptr {
-    return std::make_shared<inner_scheduler<Inner>>(std::forward<Inner>(i));
+    return std::make_shared<inner_scheduler<rxu::decay_t<Inner>>>(std::forward<Inner>(i));
 }
 auto make_inner_scheduler(detail::const_scheduler_interface_ptr i) -> detail::scheduler_interface_ptr {
     return std::const_pointer_cast<scheduler_interface>(i);
@@ -611,6 +611,14 @@ public:
     template<class OI>
     scheduler(scheduler<OI>&& o)
         : inner(detail::make_inner_scheduler(std::move(o.inner)))
+    {
+    }
+    scheduler(const scheduler& o)
+        : inner(o.inner)
+    {
+    }
+    scheduler(scheduler&& o)
+        : inner(std::move(o.inner))
     {
     }
 

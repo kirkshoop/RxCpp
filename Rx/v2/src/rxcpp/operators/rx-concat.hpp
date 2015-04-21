@@ -95,11 +95,16 @@ auto make_scheduled_subscriber(Worker w, composite_subscription f, composite_sub
     auto scrbr = std::make_shared<scheduled_subscriber_state<T, Worker, OnNext, OnError, OnCompleted>>(w, f, t, n, e, c);
 
     auto disposer = make_one_and_done([=](){
+        if (!scrbr->fromtoken.expired()) {
+            scrbr->from.remove(scrbr->fromtoken);
+        }
+        if (!scrbr->totoken.expired()) {
+            scrbr->to.remove(scrbr->totoken);
+        }
         auto done = fin() || !scrbr->to.is_subscribed();
         if (done) {
             scrbr->from.unsubscribe();
             scrbr->to.unsubscribe();
-            scrbr->worker.unsubscribe();
         }
     });
 
