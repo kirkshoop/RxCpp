@@ -8,7 +8,7 @@ namespace rxsc=rxcpp::schedulers;
 //#include "rxcpp/rx-test.hpp"
 #include "catch.hpp"
 
-const int static_onnextcalls = 100000;
+const int static_onnextcalls = 10000;
 
 
 SCENARIO("range immediate", "[range][immediate][perf]"){
@@ -33,6 +33,7 @@ SCENARIO("range immediate", "[range][immediate][perf]"){
             rxs::range(0, 9) |
                 rxo::map([&](int ){ return rxs::range(0, (sectionCount / 10) - 1); }) |
                 rxo::concat() |
+                rxo::take(100) |
                 rxo::as_blocking() |
                 rxo::subscribe<int>(
                     cs,
@@ -78,6 +79,7 @@ SCENARIO("range new_thread", "[range][new_thread][perf]"){
             rxs::range(0, 9, 1, sc) |
                 rxo::map([&](int ){ return rxs::range(0, (sectionCount / 10) - 1, 1, sc) | rxo::finally([](){std::cout << "nested  thread " << std::this_thread::get_id() << std::endl;}); }) |
                 rxo::concat(sc) |
+                rxo::take(100) |
                 rxo::as_blocking() |
                 rxo::subscribe<int>(
                     cs,
@@ -98,7 +100,7 @@ SCENARIO("range new_thread", "[range][new_thread][perf]"){
     }
 }
 
-static const int static_tripletCount = 10;
+static const int static_tripletCount = 1;
 
 SCENARIO("concat pythagorian ranges", "[range][concat][pythagorian][perf]"){
     const int& tripletCount = static_tripletCount;
@@ -109,7 +111,7 @@ SCENARIO("concat pythagorian ranges", "[range][concat][pythagorian][perf]"){
 
             auto test = [&](rxsc::scheduler<> sc) {
 
-                int c = 0;
+                std::atomic<int> c = 0;
                 int ct = 0;
                 int n = 1;
                 auto start = clock::now();
