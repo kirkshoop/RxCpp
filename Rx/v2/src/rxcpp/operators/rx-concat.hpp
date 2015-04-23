@@ -60,7 +60,7 @@ struct scheduled_subscriber_state : public std::enable_shared_from_this<schedule
     typename composite_subscription::weak_subscription totoken;
 };
 
-template<class T, class Worker, class OnNext, class OnError, class OnCompleted>
+template<class T, class Worker, class OnNext, class OnError, class OnCompleted, class Check = rxu::types_checked>
 struct scheduled_subscriber
 {
 
@@ -85,6 +85,25 @@ struct scheduled_subscriber
         localState->worker.schedule(make_one_and_done([=](){
             localState->oncompleted();
         }));
+    }
+};
+
+template<class T, class Worker, class OnNext, class OnError, class OnCompleted>
+struct scheduled_subscriber<T, Worker, OnNext, OnError, OnCompleted, typename rxu::types_checked_from<typename rxu::decay_t<Worker>::inner_type::immediate_tag>::type>
+{
+
+    std::shared_ptr<scheduled_subscriber_state<T, Worker, OnNext, OnError, OnCompleted>> state;
+
+    explicit scheduled_subscriber(std::shared_ptr<scheduled_subscriber_state<T, Worker, OnNext, OnError, OnCompleted>> s) : state(s) {}
+
+    void on_next(T v) const {
+        state->onnext(v);
+    }
+    void on_error(std::exception_ptr e) const {
+        state->onerror(e);
+    }
+    void on_completed() const {
+        state->oncompleted();
     }
 };
 

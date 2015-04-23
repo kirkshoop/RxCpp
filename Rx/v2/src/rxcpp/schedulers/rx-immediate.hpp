@@ -11,11 +11,27 @@ namespace rxcpp {
 
 namespace schedulers {
 
-struct immediate
+struct tag_immediate {}; 
+
+struct immediate_base 
+{
+    typedef tag_immediate immediate_tag;
+};
+
+template<class T, class C = rxu::types_checked>
+struct is_immediate : public std::false_type {};
+
+template<class T>
+struct is_immediate<T, typename rxu::types_checked_from<typename rxu::decay_t<T>::immediate_tag>::type> : public std::true_type {};
+
+template<class T>
+struct is_immediate<T, typename rxu::types_checked_from<typename rxu::decay_t<T>::inner_type::immediate_tag>::type> : public std::true_type {};
+
+struct immediate : public immediate_base
 {
     typedef scheduler_base::clock_type clock_type;
 private:
-    struct immediate_worker
+    struct immediate_worker : public immediate_base
     {
         typedef scheduler_base::clock_type clock_type;
     private:

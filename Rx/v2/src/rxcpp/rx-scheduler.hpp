@@ -280,6 +280,7 @@ class worker<void> : public worker_base
     detail::worker_interface_ptr inner;
     friend bool operator==(const worker&, const worker&);
 public:
+    typedef void inner_type;
     typedef scheduler_base::clock_type clock_type;
     typedef composite_subscription::weak_subscription weak_subscription;
 
@@ -401,6 +402,7 @@ class worker : public worker_base
     friend bool operator==(const worker&, const worker&);
     friend class worker<void>;
 public:
+    typedef Inner inner_type;
     typedef scheduler_base::clock_type clock_type;
     typedef composite_subscription::weak_subscription weak_subscription;
 
@@ -592,6 +594,7 @@ class scheduler<void> : public scheduler_base
     detail::scheduler_interface_ptr inner;
     friend bool operator==(const scheduler&, const scheduler&);
 public:
+    typedef void inner_type;
     typedef scheduler_base::clock_type clock_type;
     typedef worker<> worker_type;
 
@@ -652,6 +655,7 @@ class scheduler : public scheduler_base
     friend bool operator==(const scheduler&, const scheduler&);
     friend class scheduler<>;
 public:
+    typedef Inner inner_type;
     typedef scheduler_base::clock_type clock_type;
     typedef decltype(((Inner*)nullptr)->create_worker(composite_subscription())) worker_type;
 
