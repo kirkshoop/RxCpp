@@ -1,0 +1,1 @@
+Write-NuGetPackage .\rxcpp.autoconfig
