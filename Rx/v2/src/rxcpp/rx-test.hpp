@@ -79,11 +79,12 @@ public:
     \ingroup group-observable
 
 */
-template<class T>
+template<class T, class SourceOperator = typename detail::test_source<T>>
 class testable_observable
-    : public observable<T, typename detail::test_source<T>>
+    : public observable_root<T, SourceOperator, testable_observable<T, SourceOperator>>
+    , public observable_operators<T, SourceOperator, testable_observable<T, SourceOperator>>
 {
-    typedef observable<T, typename detail::test_source<T>> observable_base;
+    typedef observable_root<T, SourceOperator, testable_observable<T, SourceOperator>> observable_base;
     typedef typename detail::test_subject_base<T>::type test_subject;
     test_subject ts;
 
@@ -91,6 +92,9 @@ class testable_observable
 
 public:
     typedef typename detail::test_subject_base<T>::recorded_type recorded_type;
+
+    typedef T value_type;
+    typedef rxu::decay_t<SourceOperator> source_operator_type;
 
     explicit testable_observable(test_subject ts)
         : observable_base(detail::test_source<T>(ts))

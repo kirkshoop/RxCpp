@@ -119,17 +119,20 @@ grouped_observable<K, T> make_dynamic_grouped_observable(Source&& s) {
 */
 template<class K, class T, class SourceOperator>
 class grouped_observable
-    : public observable<T, SourceOperator>
+    : public observable_root<T, SourceOperator, grouped_observable<T, SourceOperator>>
+    , public observable_operators<T, SourceOperator, grouped_observable<T, SourceOperator>>
 {
     typedef grouped_observable<K, T, SourceOperator> this_type;
-    typedef observable<T, SourceOperator> base_type;
-    typedef rxu::decay_t<SourceOperator> source_operator_type;
-
-    static_assert(detail::has_on_get_key_for<K, source_operator_type>::value, "inner must have on_get_key method key_type()");
+    typedef observable_root<T, SourceOperator, this_type> base_type;
 
 public:
     typedef rxu::decay_t<K> key_type;
     typedef tag_grouped_observable observable_tag;
+
+    typedef T value_type;
+    typedef rxu::decay_t<SourceOperator> source_operator_type;
+
+    static_assert(detail::has_on_get_key_for<K, source_operator_type>::value, "inner must have on_get_key method key_type()");
 
     grouped_observable()
     {

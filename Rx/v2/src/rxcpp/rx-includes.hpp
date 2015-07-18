@@ -143,6 +143,7 @@
 #include "rx-subjects.hpp"
 #include "rx-operators.hpp"
 #include "rx-observable.hpp"
+#include "rx-observable_operators.hpp"
 #include "rx-connectable_observable.hpp"
 #include "rx-grouped_observable.hpp"
 

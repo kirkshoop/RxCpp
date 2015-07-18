@@ -189,6 +189,12 @@ auto take_until(TriggerObservable t, Coordination sf)
     return  detail::take_until_factory<TriggerObservable, Coordination>(std::move(t), std::move(sf));
 }
 
+template<class TriggerObservable>
+auto take_until(TriggerObservable t)
+    ->      detail::take_until_factory<TriggerObservable, decltype(identity_current_thread())> {
+    return  detail::take_until_factory<TriggerObservable, decltype(identity_current_thread())>(std::move(t), identity_current_thread());
+}
+
 }
 
 }

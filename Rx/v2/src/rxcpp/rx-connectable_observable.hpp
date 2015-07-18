@@ -103,16 +103,19 @@ connectable_observable<T> make_dynamic_connectable_observable(Source&& s) {
 */
 template<class T, class SourceOperator>
 class connectable_observable
-    : public observable<T, SourceOperator>
+    : public observable_root<T, SourceOperator, connectable_observable<T, SourceOperator>>
+    , public observable_operators<T, SourceOperator, connectable_observable<T, SourceOperator>>
 {
     typedef connectable_observable<T, SourceOperator> this_type;
-    typedef observable<T, SourceOperator> base_type;
-    typedef rxu::decay_t<SourceOperator> source_operator_type;
-
-    static_assert(detail::has_on_connect<source_operator_type>::value, "inner must have on_connect method void(composite_subscription)");
+    typedef observable_root<T, SourceOperator, this_type> base_type;
 
 public:
     typedef tag_connectable_observable observable_tag;
+
+    typedef T value_type;
+    typedef rxu::decay_t<SourceOperator> source_operator_type;
+
+    static_assert(detail::has_on_connect<source_operator_type>::value, "inner must have on_connect method void(composite_subscription)");
 
     connectable_observable()
     {
