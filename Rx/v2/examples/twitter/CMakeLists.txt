@@ -1,0 +1,59 @@
+cmake_minimum_required(VERSION 3.2 FATAL_ERROR)
+
+get_filename_component(SAMPLE_PROJECT "${CMAKE_CURRENT_SOURCE_DIR}" NAME)
+
+project(${SAMPLE_PROJECT} LANGUAGES C CXX)
+
+# define some folders
+get_filename_component(RXCPP_DIR "${CMAKE_CURRENT_SOURCE_DIR}" PATH)
+get_filename_component(RXCPP_DIR "${RXCPP_DIR}" PATH)
+get_filename_component(RXCPP_DIR "${RXCPP_DIR}" PATH)
+get_filename_component(RXCPP_DIR "${RXCPP_DIR}" PATH)
+
+MESSAGE( STATUS "RXCPP_DIR: " ${RXCPP_DIR} )
+
+include(FindPackageHandleStandardArgs)
+
+include(${RXCPP_DIR}/projects/CMake/shared.cmake)
+
+find_path(LIBOAUTH_INCLUDE_DIR oauth.h
+	PATH_SUFFIXES liboauth)
+
+MESSAGE( STATUS "LIBOAUTH_INCLUDE_DIR: " ${LIBOAUTH_INCLUDE_DIR} )
+
+find_library(LIBOAUTH_LIBRARY NAMES oauth)
+
+set(LIBOAUTH_LIBRARIES ${LIBOAUTH_LIBRARY})
+set(LIBOAUTH_INCLUDE_DIRS ${LIBOAUTH_INCLUDE_DIR})
+
+find_package_handle_standard_args(liboauth DEFAULT_MSG
+	LIBOAUTH_LIBRARY LIBOAUTH_INCLUDE_DIR)
+mark_as_advanced(LIBOAUTH INCLUDE_DIR LIBOAUTH_LIBRARY)
+
+find_package(CURL)
+
+find_path(JSON_INCLUDE_DIR json.hpp)
+set(JSON_INCLUDE_DIRS ${JSON_INCLUDE_DIR})
+
+MESSAGE( STATUS "JSON_INCLUDE_DIR: " ${JSON_INCLUDE_DIR} )
+
+# define the sources
+set(SAMPLE_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
+)
+add_executable(${SAMPLE_PROJECT} ${SAMPLE_SOURCES})
+add_executable(rxcpp::examples::${SAMPLE_PROJECT} ALIAS ${SAMPLE_PROJECT})
+target_compile_options(${SAMPLE_PROJECT} PUBLIC ${RX_COMPILE_OPTIONS})
+target_compile_features(${SAMPLE_PROJECT} PUBLIC ${RX_COMPILE_FEATURES})
+target_include_directories(${SAMPLE_PROJECT} PUBLIC ${RX_SRC_DIR} ${LIBOAUTH_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS} ${JSON_INCLUDE_DIRS})
+target_link_libraries(${SAMPLE_PROJECT} ${CMAKE_THREAD_LIBS_INIT} ${LIBOAUTH_LIBRARY} ${CURL_LIBRARIES})
+
+# configure unit tests via CTest
+enable_testing()
+set(CTEST_CONFIGURATION_TYPE "${JOB_BUILD_CONFIGURATION}")
+
+set_target_properties(${SAMPLE_PROJECT} PROPERTIES FOLDER "Examples")
+
+add_test(NAME RunTests
+     WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+     COMMAND ${SAMPLE_PROJECT} ${TEST_ARGS})
