@@ -277,7 +277,7 @@ struct member_overload<with_latest_from_tag>
         class Enabled = rxu::enable_if_all_true_type_t<
             is_coordination<Coordination>,
             all_observables<Observable, ObservableN...>>,
-        class with_latest_from = rxo::detail::with_latest_from<Coordination, rxu::detail::pack, rxu::decay_t<Observable>, rxu::decay_t<ObservableN>...>,
+        class with_latest_from = rxo::detail::with_latest_from<rxu::decay_t<Coordination>, rxu::detail::pack, rxu::decay_t<Observable>, rxu::decay_t<ObservableN>...>,
         class Value = rxu::value_type_t<with_latest_from>,
         class Result = observable<Value, with_latest_from>>
     static Result member(Observable&& o, Coordination&& cn, ObservableN&&... on)
@@ -291,7 +291,7 @@ struct member_overload<with_latest_from_tag>
             operators::detail::is_with_latest_from_selector<Selector, Observable, ObservableN...>,
             all_observables<Observable, ObservableN...>>,
         class ResolvedSelector = rxu::decay_t<Selector>,
-        class with_latest_from = rxo::detail::with_latest_from<Coordination, ResolvedSelector, rxu::decay_t<Observable>, rxu::decay_t<ObservableN>...>,
+        class with_latest_from = rxo::detail::with_latest_from<rxu::decay_t<Coordination>, ResolvedSelector, rxu::decay_t<Observable>, rxu::decay_t<ObservableN>...>,
         class Value = rxu::value_type_t<with_latest_from>,
         class Result = observable<Value, with_latest_from>>
     static Result member(Observable&& o, Coordination&& cn, Selector&& s, ObservableN&&... on)
