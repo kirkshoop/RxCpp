@@ -428,7 +428,7 @@ class schedulable : public schedulable_base
     typedef schedulable this_type;
 
     composite_subscription lifetime;
-    weak_worker controller;
+    worker controller;
     action activity;
     bool scoped;
     composite_subscription::weak_subscription action_scope;
@@ -500,7 +500,7 @@ public:
     ~schedulable()
     {
         if (scoped) {
-            controller.lock().remove(action_scope);
+            controller.remove(action_scope);
         }
     }
     schedulable()
@@ -522,7 +522,7 @@ public:
         , controller(q)
         , activity(std::move(a))
         , scoped(true)
-        , action_scope(controller.lock().add(lifetime))
+        , action_scope(controller.add(lifetime))
     {
     }
     /// inherit lifetimes
@@ -531,7 +531,7 @@ public:
         , controller(q)
         , activity(std::move(a))
         , scoped(scbl.scoped)
-        , action_scope(scbl.scoped ? controller.lock().add(lifetime) : weak_subscription())
+        , action_scope(scbl.scoped ? controller.add(lifetime) : weak_subscription())
     {
     }
 
@@ -542,10 +542,10 @@ public:
         return lifetime;
     }
     inline const worker get_worker() const {
-        return controller.lock();
+        return controller;
     }
     inline worker get_worker() {
-        return controller.lock();
+        return controller;
     }
     inline const action& get_action() const {
         return activity;
@@ -606,7 +606,7 @@ public:
     // scheduler
     //
     inline clock_type::time_point now() const {
-        return controller.lock().now();
+        return controller.now();
     }
     /// put this on the queue of the stored scheduler to run asap
     inline void schedule() const {
@@ -910,8 +910,8 @@ private:
     int64_t ordinal;
 public:
 
-    schedulable_queue() 
-        : ordinal(0) 
+    schedulable_queue()
+        : ordinal(0)
     {
     }
 

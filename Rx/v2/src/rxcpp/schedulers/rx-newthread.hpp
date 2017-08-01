@@ -28,68 +28,68 @@ private:
 
         new_worker(const this_type&);
 
-        struct new_worker_state : public std::enable_shared_from_this<new_worker_state>
-        {
-            typedef detail::schedulable_queue<
-                typename clock_type::time_point> queue_item_time;
+        typedef detail::schedulable_queue<
+            typename clock_type::time_point> queue_item_time;
 
-            typedef queue_item_time::item_type item_type;
+        typedef queue_item_time::item_type item_type;
 
-            virtual ~new_worker_state()
-            {
-                std::unique_lock<std::mutex> guard(lock);
-                if (worker.joinable() && worker.get_id() != std::this_thread::get_id()) {
-                    lifetime.unsubscribe();
-                    guard.unlock();
-                    worker.join();
-                }
-                else {
-                    lifetime.unsubscribe();
-                    worker.detach();
-                }
-            }
-
-            explicit new_worker_state(composite_subscription cs)
-                : lifetime(cs)
-            {
-            }
-
-            composite_subscription lifetime;
-            mutable std::mutex lock;
-            mutable std::condition_variable wake;
-            mutable queue_item_time q;
-            std::thread worker;
-            recursion r;
-        };
-
-        std::shared_ptr<new_worker_state> state;
+        composite_subscription lifetime;
+        mutable std::mutex lock;
+        mutable std::condition_variable wake;
+        mutable queue_item_time q;
+        std::thread worker;
+        recursion r;
 
     public:
         virtual ~new_worker()
         {
+            std::cerr << "new worker down!" << std::endl;
+            lifetime.unsubscribe();
         }
 
-        explicit new_worker(std::shared_ptr<new_worker_state> ws)
-            : state(ws)
+        new_worker(composite_subscription cs)
+            : lifetime(cs)
         {
         }
 
-        new_worker(composite_subscription cs, thread_factory& tf)
-            : state(std::make_shared<new_worker_state>(cs))
-        {
-            auto keepAlive = state;
+        void start(thread_factory& tf) {
 
-            state->lifetime.add([keepAlive](){
-                std::unique_lock<std::mutex> guard(keepAlive->lock);
-                auto expired = std::move(keepAlive->q);
-                if (!keepAlive->q.empty()) std::terminate();
-                keepAlive->wake.notify_one();
+            lifetime.add([this](){
+                std::cerr << ">>unsub" << std::endl;
+                std::unique_lock<std::mutex> guard(this->lock);
+                auto expired = std::move(this->q);
+                std::cerr << "-locked-" << std::endl;
+                if (!this->q.empty()) std::terminate();
+                this->wake.notify_one();
+                std::cerr << "-notified-" << std::endl;
+
+                if (this->worker.joinable() && this->worker.get_id() != std::this_thread::get_id()) {
+                    guard.unlock();
+                    this->worker.join();
+                std::cerr << "-joined-" << std::endl;
+                }
+                else {
+                    this->worker.detach();
+                std::cerr << "-detached-" << std::endl;
+                std::cerr << "unsub<<" << std::endl;
+                }
             });
 
-            state->worker = tf([keepAlive](){
+            //std::weak_ptr<new_worker> weak = std::shared_ptr<new_worker>(this->shared_from_this(), this);
+            auto keepAlive = std::shared_ptr<new_worker>(this->shared_from_this(), this);
+
+            worker = tf([keepAlive](){
+
+                RXCPP_UNWIND_AUTO([]{
+                    std::cerr << "thread down!" << std::endl;
+                });
+                std::cerr << "thread up!" << std::endl;
+
+//                auto keepAlive = weak;
+//                if (!keepAlive) { return; }
 
                 // take ownership
-                queue_type::ensure(std::make_shared<new_worker>(keepAlive));
+                queue_type::ensure(keepAlive);
                 // release ownership
                 RXCPP_UNWIND_AUTO([]{
                     queue_type::destroy();
@@ -133,11 +133,11 @@ private:
 
         virtual void schedule(clock_type::time_point when, const schedulable& scbl) const {
             if (scbl.is_subscribed()) {
-                std::unique_lock<std::mutex> guard(state->lock);
-                state->q.push(new_worker_state::item_type(when, scbl));
-                state->r.reset(false);
+                std::unique_lock<std::mutex> guard(lock);
+                q.push(item_type(when, scbl));
+                r.reset(false);
             }
-            state->wake.notify_one();
+            wake.notify_one();
         }
     };
 
@@ -163,7 +163,9 @@ public:
     }
 
     virtual worker create_worker(composite_subscription cs) const {
-        return worker(cs, std::make_shared<new_worker>(cs, factory));
+        auto w = std::make_shared<new_worker>(cs);
+        w->start(factory);
+        return worker(cs, w);
     }
 };
 
